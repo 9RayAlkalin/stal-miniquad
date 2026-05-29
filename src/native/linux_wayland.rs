@@ -537,7 +537,7 @@ enum WaylandEvent {
     RawMotion(f32, f32),
     PointerButton(MouseButton, bool),
     PointerAxis(f32, f32),
-    Touch(crate::TouchPhase, u64, f32, f32),
+    Touch(crate::TouchPhase, u64, f32, f32, f64),
     FilesDropped(String),
     Resize(f32, f32),
     WindowMinimized,
@@ -802,7 +802,7 @@ unsafe extern "C" fn touch_handle_down(
     data: *mut std::ffi::c_void,
     _touch: *mut wl_touch,
     _serial: core::ffi::c_uint,
-    _time: core::ffi::c_uint,
+    time: core::ffi::c_uint,
     surface: *mut wl_surface,
     id: core::ffi::c_int,
     x: wl_fixed_t,
@@ -820,6 +820,7 @@ unsafe extern "C" fn touch_handle_down(
             id as _,
             x,
             y,
+            time as f64 / 1000.,
         ));
     }
 }
@@ -827,7 +828,7 @@ unsafe extern "C" fn touch_handle_down(
 unsafe extern "C" fn touch_handle_motion(
     data: *mut std::ffi::c_void,
     _touch: *mut wl_touch,
-    _time: core::ffi::c_uint,
+    time: core::ffi::c_uint,
     id: core::ffi::c_int,
     x: wl_fixed_t,
     y: wl_fixed_t,
@@ -840,7 +841,7 @@ unsafe extern "C" fn touch_handle_motion(
         display.touch_positions.insert(id, (x, y));
         display
             .events
-            .push(WaylandEvent::Touch(crate::TouchPhase::Moved, id as _, x, y));
+            .push(WaylandEvent::Touch(crate::TouchPhase::Moved, id as _, x, y, time as f64 / 1000.));
     }
 }
 
@@ -848,7 +849,7 @@ unsafe extern "C" fn touch_handle_up(
     data: *mut std::ffi::c_void,
     _touch: *mut wl_touch,
     _serial: core::ffi::c_uint,
-    _time: core::ffi::c_uint,
+    time: core::ffi::c_uint,
     id: core::ffi::c_int,
 ) {
     let display: &mut WaylandPayload = &mut *(data as *mut _);
@@ -856,7 +857,7 @@ unsafe extern "C" fn touch_handle_up(
         if let Some((x, y)) = display.touch_positions.remove(&id) {
             display
                 .events
-                .push(WaylandEvent::Touch(crate::TouchPhase::Ended, id as _, x, y));
+                .push(WaylandEvent::Touch(crate::TouchPhase::Ended, id as _, x, y, time as f64 / 1000.));
         }
     }
 }
@@ -869,6 +870,7 @@ unsafe extern "C" fn touch_handle_cancel(data: *mut std::ffi::c_void, _touch: *m
             id as _,
             x,
             y,
+            0.0,
         ));
     }
 }
@@ -1282,8 +1284,8 @@ where
                         }
                     }
                     WaylandEvent::PointerAxis(x, y) => event_handler.mouse_wheel_event(x, y),
-                    WaylandEvent::Touch(phase, id, x, y) => {
-                        event_handler.touch_event(phase, id, x, y)
+                    WaylandEvent::Touch(phase, id, x, y, time) => {
+                        event_handler.touch_event(phase, id, x, y, time)
                     }
                     WaylandEvent::Resize(width, height) => {
                         event_handler.resize_event(width, height)
