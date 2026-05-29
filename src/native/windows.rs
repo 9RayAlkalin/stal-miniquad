@@ -112,6 +112,7 @@ pub(crate) struct WindowsDisplay {
     event_handler: Option<Box<dyn EventHandler>>,
     modal_resizing_timer: usize,
     update_requested: bool,
+    ime_position: Option<(i32, i32)>,
 }
 
 impl WindowsDisplay {
@@ -133,6 +134,9 @@ impl WindowsDisplay {
     }
     /// Set IME candidate window position in client coordinates
     fn set_ime_position(&mut self, x: i32, y: i32) {
+        // Save user-set position for use in WM_IME_STARTCOMPOSITION
+        self.ime_position = Some((x, y));
+        
         unsafe {
             let himc = ImmGetContext(self.wnd);
             if himc.is_null() {
@@ -704,8 +708,14 @@ unsafe extern "system" fn win32_wndproc(
             // Set candidate window position when IME starts composition
             let himc = ImmGetContext(hwnd);
             if !himc.is_null() {
-                let mut pt: POINT = std::mem::zeroed();
-                GetCaretPos(&mut pt);
+                // Use user-set position if available, otherwise fall back to caret position
+                let pt = if let Some((x, y)) = payload.ime_position {
+                    POINT { x, y }
+                } else {
+                    let mut pt: POINT = std::mem::zeroed();
+                    GetCaretPos(&mut pt);
+                    pt
+                };
                 
                 let comp_form = COMPOSITIONFORM {
                     dwStyle: CFS_POINT,
@@ -1257,6 +1267,7 @@ where
             event_handler: None,
             modal_resizing_timer: 0,
             update_requested: true,
+            ime_position: None,
         };
         display.init_dpi(conf.high_dpi);
 
