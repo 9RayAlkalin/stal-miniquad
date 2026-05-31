@@ -50,6 +50,8 @@ const CFS_CANDIDATEPOS: DWORD = 0x0040;
 // ImmAssociateContextEx flags
 const IACE_DEFAULT: DWORD = 0x0010;
 
+const WHEEL_DELTA: f32 = 120.0;
+
 // COMPOSITIONFORM structure
 #[repr(C)]
 #[allow(non_snake_case)]
@@ -634,10 +636,10 @@ unsafe extern "system" fn win32_wndproc(
         }
 
         WM_MOUSEHWHEEL => {
-            event_handler.mouse_wheel_event((HIWORD(wparam as _) as i16) as f32, 0.0);
+            event_handler.mouse_wheel_event((HIWORD(wparam as _) as i16) as f32 / WHEEL_DELTA, 0.0);
         }
         WM_MOUSEWHEEL => {
-            event_handler.mouse_wheel_event(0.0, (HIWORD(wparam as _) as i16) as f32);
+            event_handler.mouse_wheel_event(0.0, (HIWORD(wparam as _) as i16) as f32 / WHEEL_DELTA);
         }
         WM_CHAR => {
             let chr = wparam as u32;
@@ -972,7 +974,6 @@ unsafe fn create_window(
     resizable: bool,
     width: i32,
     height: i32,
-    headless: bool,
 ) -> (HWND, HDC) {
     let mut wndclassw: WNDCLASSW = std::mem::zeroed();
 
@@ -1241,7 +1242,6 @@ where
             conf.window_resizable,
             conf.window_width as _,
             conf.window_height as _,
-            conf.headless
         );
         if let Some(icon) = &conf.icon {
             set_icon(wnd, icon);
