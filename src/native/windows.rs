@@ -636,6 +636,9 @@ unsafe extern "system" fn win32_wndproc(
         WM_MOUSEHWHEEL => {
             event_handler.mouse_wheel_event((HIWORD(wparam as _) as i16) as f32, 0.0);
         }
+        WM_MOUSEWHEEL => {
+            event_handler.mouse_wheel_event(0.0, (HIWORD(wparam as _) as i16) as f32);
+        }
         WM_CHAR => {
             let chr = wparam as u32;
             let repeat = !!(lparam & 0x40000000) != 0;
