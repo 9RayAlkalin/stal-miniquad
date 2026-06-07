@@ -55,6 +55,7 @@ enum Message {
         touch_id: u64,
         x: f32,
         y: f32,
+        time: u64,
     },
     Character {
         character: u32,
@@ -201,8 +202,9 @@ impl MainThreadState {
                 touch_id,
                 x,
                 y,
+                time,
             } => {
-                self.event_handler.touch_event(phase, touch_id, x, y);
+                self.event_handler.touch_event(phase, touch_id, x, y, time as f64 / 1000.);
             }
             Message::Character { character } => {
                 if let Some(character) = char::from_u32(character) {
@@ -551,6 +553,29 @@ unsafe fn create_native_window(surface: ndk_sys::jobject) -> *mut ndk_sys::ANati
 }
 
 #[no_mangle]
+pub unsafe extern "C" fn Java_quad_1native_QuadNative_initializeContext(
+    env: *mut ndk_sys::JNIEnv,
+    _: ndk_sys::jobject,
+    activity: ndk_sys::jobject,
+) {
+    let env = attach_jni_env();
+    let activity_ref = (**env).NewGlobalRef.unwrap()(env, activity);
+    ndk_context::initialize_android_context(std::mem::transmute(VM), activity_ref as _);
+
+    let mut env = unsafe { jni::JNIEnv::from_raw(env as *mut jni::sys::JNIEnv).unwrap() };
+    let context = unsafe { jni::objects::JObject::from_raw(activity as jni::sys::jobject) };
+    let _ = rustls_platform_verifier::android::init_with_env(&mut env, context);
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn Java_quad_1native_QuadNative_releaseContext(
+    _: *mut ndk_sys::JNIEnv,
+    _: ndk_sys::jobject,
+) {
+    ndk_context::release_android_context();
+}
+
+#[no_mangle]
 pub unsafe extern "C" fn Java_quad_1native_QuadNative_activityOnCreate(
     _: *mut ndk_sys::JNIEnv,
     _: ndk_sys::jobject,
@@ -625,6 +650,7 @@ extern "C" fn Java_quad_1native_QuadNative_surfaceOnTouch(
     action: ndk_sys::jint,
     x: ndk_sys::jfloat,
     y: ndk_sys::jfloat,
+    time: ndk_sys::jlong,
 ) {
     let phase = match action {
         0 => TouchPhase::Moved,
@@ -639,6 +665,7 @@ extern "C" fn Java_quad_1native_QuadNative_surfaceOnTouch(
         touch_id: touch_id as _,
         x: x as f32,
         y: y as f32,
+        time: time as u64,
     });
 }
 
